@@ -50,10 +50,21 @@ const CustomField = (props: CustomFieldProps) => {
     );
   }
 
+  // handling clicks on each status 
+  //OG url = https://pksolsfms.ottomatic.cloud/fmi/odata/v4/Legacy/IVR?$select=___IVR,Status,Patient,Account,DateText&$filter=Status%20ne%20'Archived'&$orderby=Status asc
+  const handleClick = (status) => {
+    
+    console.log("Setting Variable now")
+    five.setVariable("Status", `Status eq '${status}'`);
+    five.refreshDataViews();
+    
+  }
+
   useEffect(() => {
     console.log("Use effect triggered for Status");
     if (ivr === null) {
       setLoading(true);
+     
       const fetchData = async () => {
         await five.executeFunction(
           "getAccountIVR",
@@ -94,165 +105,16 @@ const CustomField = (props: CustomFieldProps) => {
 
   const cardStyle = {
     width: "150px",
-    // width: "100%",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    //marginRight: "10px 0",
     padding: "10px 20px",
     fontSize: '10px', 
     color: "white",
-    // maxHeight: "50px", // Adjust the height as needed
-    // textAlign: "center", // Ensure text is centered within the card
-    // boxsmallmallizing: "border-box"
+
   };
 
-  // return (
-  //   <Container
-  //     style={{
-  //       maxWidth: "100vw",
-  //       background: "transparent",
-  //       border: "none",
-  //       outline: "none",
-  //       padding: "0",
-  //       margin: "0",
-  //     }}
-  //   >
-  //     <Box
-  //       style={{
-  //         display: "flex",
-  //         justifyContent: "space-between",
-  //         alignItems: "center",
-  //         flexDirection: "row",
-  //         maxWidth: "100vw",
-  //         background: "transparent",
-  //         border: "none",
-  //         outline: "none",
-  //         padding: "0",
-  //         margin: "0",
-  //       }}
-  //     >
-  //       <Card style={{ ...cardStyle, backgroundColor: "#8DAC6E" }}>
-  //         <Check style={{ fill: "white", color: "white" }} />
-  //         {" "}Approved{" "}(
-  //         {status.Approved}
-  //         )
-  //       </Card>
-  //       <Card style={{ ...cardStyle, backgroundColor: "#FCBD09" }}>
-  //         <HourglassBottom style={{ fill: "white", color: "white" }}/>
-  //         {" "}Pending{" "}(
-  //         {status.Pending}
-  //         )
-  //       </Card>
-  //       <Card style={{ ...cardStyle, backgroundColor: "#D70902" }}>
-  //         <Cancel />
-  //         {" "}Denied{" "}(
-  //         {status.Denied}
-  //         )
-  //       </Card>
-  //       <Card style={{ ...cardStyle, backgroundColor: "#343434" }}>
-  //         <Lock />
-  //         {" "}Archived{" "}(
-  //         {status.Archived}
-  //         )
-  //       </Card>
-  //       <Card style={{ ...cardStyle, backgroundColor: "#276787" }}>
-  //         <Alarm />
-  //         {" "}Conditional{" "}(
-  //         {status.Conditional}
-  //         )
-  //       </Card>
-  //       <Card style={{ ...cardStyle, backgroundColor: "#9A9A9A" }}>
-  //         <HourglassBottom />
-  //         {" "}Unsubmitted{" "}(
-  //         {status.Unsubmitted}
-  //         )
-  //       </Card>
-  //     </Box>
-  //   </Container>
-  // );  
-  //return (
   return(
-  // <ThemeProvider theme={theme}>
-    // <Container
-    //   style={{
-    //     maxWidth: "100vw",
-    //     background: "white",
-    //     border: "none",
-    //     outline: "none",
-    //     padding: "0",
-    //     margin: "0"
-    //   }}
-    // >
-      
-    //     {/* <Box
-    //       style={{
-    //         display: "flex",
-    //         justifyContent: "space-between",
-    //         alignItems: "center",
-    //         flexDirection: "row",
-    //         maxWidth: "100vw",
-    //         background: "transparent",
-    //         border: "none",
-    //         outline: "none",
-    //         padding: "0",
-    //         margin: "0",
-    //       }}
-    //     > */}
-    //   <Grid container spacing={1} justifyContent={"center"} columns={{ xsmall: 6, small: 6, medium: 2, large: 30}} >
-    //       {status.Approved !== undefined && (
-    //         <Grid item xsmall={6} small={4} medium={1} large={5}>
-    //             <Card style={{ ...cardStyle, backgroundColor: "#8DAC6E" }}>
-    //               <Check style={{ fill: "white", color: "white" }} />
-    //               <Typography noWrap style={{fontSize: '10px'}}>Approved ({status.Approved})</Typography>
-    //             </Card>
-    //         </Grid>
-    //       )}
-    //       {status.Pending !== undefined && (
-    //         <Grid item xsmall={6} small={4} medium={1} large={5}>
-    //           <Card style={{ ...cardStyle, backgroundColor: "#FCBD09" }}>
-    //             <HourglassBottom style={{ fill: "white", color: "white" }}/>
-    //             <Typography noWrap style={{fontSize: '10px'}}>Pending ({status.Pending})</Typography>
-    //           </Card>
-    //         </Grid>
-    //       )}
-    //       {status.Denied !== undefined && (
-    //         <Grid item xsmall={6} small={4} medium={1} large={5}>
-    //           <Card style={{ ...cardStyle, backgroundColor: "#D70902" }}>
-    //             <Cancel />
-    //             <Typography noWrap style={{fontSize: '10px'}}>Denied ({status.Denied})</Typography>
-    //           </Card>
-    //         </Grid>
-    //       )}
-    //       {status.Archived !== undefined && (
-    //         <Grid item xsmall={6} small={4} medium={1} large={5}>
-    //           <Card style={{ ...cardStyle, backgroundColor: "#343434" }}>
-    //             <Lock />
-    //             <Typography noWrap style={{fontSize: '10px'}}>Archived ({status.Archived})</Typography>
-    //           </Card>
-    //         </Grid>
-    //       )}
-    //       {status.Conditional !== undefined && (
-    //         <Grid item xsmall={6} small={4} medium={1} large={5}>
-    //           <Card style={{ ...cardStyle, backgroundColor: "#276787" }}>
-    //             <Alarm />
-    //             <Typography noWrap style={{fontSize: '10px'}}>Conditional ({status.Conditional})</Typography>                
-    //           </Card>
-    //         </Grid>
-    //       )}
-    //       {status.Unsubmitted !== undefined && (
-    //         <Grid item xsmall={6} small={4} medium={1} large={5}>
-    //           <Card style={{ ...cardStyle, backgroundColor: "#9A9A9A" }}>
-    //             <HourglassBottom />
-    //             <Typography noWrap style={{fontSize: '10px'}}>Unsubmitted ({status.Unsubmitted})</Typography>
-    //           </Card>
-    //         </Grid>
-    //       )}
-          
-    //     {/* </Box> */}
-    //   </Grid>
-    // </Container>
-  // </ThemeProvider>>
   <Container
       style={{
         maxWidth: "100vw",
@@ -264,9 +126,9 @@ const CustomField = (props: CustomFieldProps) => {
         gap:1
         // margin: "0",
       }}
-    >
+  >
 
-  <Box
+      <Box
         sx={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -280,47 +142,42 @@ const CustomField = (props: CustomFieldProps) => {
         }}
       >
         <Item sx={{ wdith:"100%" }}>
-          <Card style={{ ...cardStyle, backgroundColor: "#8DAC6E" }}>
+          <Card style={{ ...cardStyle, backgroundColor: "#8DAC6E" }} onClick={() => handleClick("Approved")}>
             <Check style={{ fill: "white", color: "white" }} />
             <Typography noWrap style={{fontSize: '10px'}}>Approved ({status.Approved})</Typography>
           </Card>
         </Item>
         <Item>
-        <Card style={{ ...cardStyle, backgroundColor: "#FCBD09" }}>
+        <Card style={{ ...cardStyle, backgroundColor: "#FCBD09" }} onClick={() => handleClick("Pending")}>
                 <HourglassBottom style={{ fill: "white", color: "white" }}/>
                 <Typography noWrap style={{fontSize: '10px'}}>Pending ({status.Pending})</Typography>
-              </Card>
+        </Card>
         </Item>
         <Item>
-        <Card style={{ ...cardStyle, backgroundColor: "#D70902" }}>
+        <Card style={{ ...cardStyle, backgroundColor: "#D70902" }} onClick={() => handleClick("Denied")}>
                 <Cancel />
                 <Typography noWrap style={{fontSize: '10px'}}>Denied ({status.Denied})</Typography>
-              </Card>
+        </Card>
         </Item>
         <Item>
-        <Card style={{ ...cardStyle, backgroundColor: "#343434" }}>
+        <Card style={{ ...cardStyle, backgroundColor: "#343434" }} onClick={() => handleClick("Archived")}>
                 <Lock />
                 <Typography noWrap style={{fontSize: '10px'}}>Archived ({status.Archived})</Typography>
-              </Card>
+        </Card>
         </Item>
         <Item>
-        <Card style={{ ...cardStyle, backgroundColor: "#276787" }}>
+        <Card style={{ ...cardStyle, backgroundColor: "#276787" }} onClick={() => handleClick("Conditional")}>
                 <Alarm />
                 <Typography noWrap style={{fontSize: '10px'}}>Conditional ({status.Conditional})</Typography>                   
-              </Card>
+        </Card>
         </Item>
         <Item>
-        <Card style={{ ...cardStyle, backgroundColor: "#9A9A9A" }}>
+        <Card style={{ ...cardStyle, backgroundColor: "#9A9A9A" }} onClick={() => handleClick("Unsubmitted")}>
                 <HourglassBottom />
                 <Typography noWrap style={{fontSize: '10px'}}>Unsubmitted ({status.Unsubmitted})</Typography>
-              </Card>
+        </Card>
         </Item>
       </Box>
-
-
-
-
-
       
     </Container>
   );
