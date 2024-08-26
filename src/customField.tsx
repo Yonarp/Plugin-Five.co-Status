@@ -104,15 +104,28 @@ const CustomField = (props: CustomFieldProps) => {
   }
 
   const cardStyle = {
-    width: "150px",
+    // width: "100px",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    padding: "10px 20px",
-    fontSize: '10px', 
+    padding: "10px 10px",
+    fontSize: "10px",
     color: "white",
-
+    borderRadius: "8px",
+    // margin: "8px",
+    cursor: "pointer",
   };
+
+  const cardCss = `
+  .statusText {
+     /* media queries */
+     @media (max-width: 630px) {
+       display: none;
+     }
+     @media (max-width: 750px) {
+      font-size:8.5px;
+     }
+  }`;
 
   return(
   <Container
