@@ -211,6 +211,5 @@ export {
     FormGroup,
     FormControlLabel,
     FormLabel,
-
     CloseIcon,
 };
