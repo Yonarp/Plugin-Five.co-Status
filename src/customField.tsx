@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Box, Card, CircularProgress, FiveInitialize } from "./FivePluginApi";
 import { CustomFieldProps } from "../../../common";
 import { Container, Typography } from "@mui/material";
+import { FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 import { Alarm, Cancel, Check, HourglassBottom, Lock, Undo } from "@mui/icons-material";
 
 FiveInitialize();
@@ -11,7 +12,7 @@ interface StatusCounts {
   Submitted: number,
   Denied: number,
   Archived: number,
-  Conditional: number,
+  Contingent: number,
   Unsubmitted: number
 }
 
@@ -20,6 +21,9 @@ const CustomField = (props: CustomFieldProps) => {
   const { five } = props;
   const [ loading, setLoading ] = useState<boolean>(false);
   const [ status, setStatus ] = useState<StatusCounts>(null);
+  const [accountKey, setAccountKey] = useState<string>("")
+  //@ts-ignore
+  const [accountList, setAccountList] = useState([])
 
   // FIX Type
   const countStatuses = (data: any) => {
@@ -28,7 +32,7 @@ const CustomField = (props: CustomFieldProps) => {
       Submitted: 0,
       Denied: 0,
       Archived: 0,
-      Conditional: 0,
+      Contingent: 0,
       Unsubmitted: 0,
     };
 
@@ -40,18 +44,29 @@ const CustomField = (props: CustomFieldProps) => {
     }
     return statusCounts;
   };
+
+  console.log("Account Key is", accountKey)
   
   const handleClick = (status: string) => {
     if(status === 'All') {
-      five.setVariable("Status", `"__USR" eq '${five.currentUserKey()}'`);
-    } else {
-      five.setVariable("Status", `Status eq '${status}'`);
-      five.setVariable("Status", `"__USR" eq '${five.currentUserKey()}' and Status eq '${status}'`);
+      five.setVariable("Status", `"__ACT" eq '${accountKey}'`);
+    }
+  /*   else if(status === 'Archived') { 
+        
+      five.setVariable("Status", `"__USR" eq '${five.currentUserKey()}' and  "_isArchived" eq 1`);
+    } */
+
+    else {
+
+      //five.setVariable("Status", `"__USR" eq '${five.currentUserKey()}' and Status eq '${status}'`);
+     
+      five.setVariable("Status", `"__ACT" eq '${accountKey}' and Status eq '${status}'`);
     }
     five.refreshDataViews();
   };
 
   useEffect(() => {
+    
     if (status !== null) {
       return;
     }
@@ -67,15 +82,39 @@ const CustomField = (props: CustomFieldProps) => {
         (result) => {
           // barrier can have issues if the values 
           const data = JSON.parse(result.serverResponse.results).response.value;
+ 
           setLoading(false);
           const statusCounts = countStatuses(data);
           setStatus(statusCounts);
+          setAccountKey(data[0].__ACT)
+        }
+      );
+
+      five.executeFunction(
+        "getUserAUJ",
+        null,
+        null,
+        null,
+        null,
+        (result) => {
+        
+          const data = JSON.parse(result.serverResponse.results).response.value
+          console.log("Logging Data from the Status Plugin.", data)
+          setAccountList(data)
+
         }
       );
     };
+
+
     fetchData();   
 
   }, []);
+
+
+  useEffect(() => {
+    handleClick('All')
+  }, [accountKey])
 
   if (loading || !status) {
     return (
@@ -129,13 +168,36 @@ const CustomField = (props: CustomFieldProps) => {
   `;
 
   return (
+    <>
+    <Box sx={{ mb: 2 }}>
+      <FormControl size="small">
+        <InputLabel id="account-select-label">Account</InputLabel>
+        <Select
+          labelId="account-select-label"
+          value={accountKey}
+          label="Account"
+          onChange={e => setAccountKey(e.target.value)}
+        >
+          {accountList.map(acc => (
+            <MenuItem key={acc.___AUJ} value={acc.__ACT}>
+              {acc.OfficeName}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </Box>
+
+
+
     <Container
       style={{
-        position: 'absolute',
-        top: 5,
-        left: "-10%",
-        margin: 0,
+       /*  position: 'absolute',
+        top: 5, */
         padding: 0,
+        margin: 0,
+        marginTop: 20,           
+       // marginLeft: "-10%",
+       // left: "-10%",
         width:'130%',
         display: "flex",
         flexDirection: "row",
@@ -149,54 +211,54 @@ const CustomField = (props: CustomFieldProps) => {
       <style>{cardCss}</style>
 
       <Item>
-        <Card className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#8DAC6E" }} onClick={() => handleClick("Approved")}>
+        <Card className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#15706A" }} onClick={() => handleClick("Approved")}>
           <Check style={{ fill: "white", color: "white" }} />
-          <Typography className="statusText" noWrap style={{ fontSize: "10px" }}>
+          <Typography className="statusText" noWrap style={{ fontSize: "12px", fontWeight: 'bolder' }}>
             Approved ({status.Approved})
           </Typography>
         </Card>
       </Item>
 
       <Item>
-        <Card className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#FCBD09" }} onClick={() => handleClick("Submitted")}>
+        <Card className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#F9AD3C" }} onClick={() => handleClick("Submitted")}>
           <HourglassBottom style={{ fill: "white", color: "white" }} />
-          <Typography className="statusText" noWrap style={{ fontSize: "10px" }}>
+          <Typography className="statusText" noWrap style={{ fontSize: "12px", fontWeight: 'bolder' }}>
             Submitted ({status.Submitted})
           </Typography>
         </Card>
       </Item>
 
       <Item>
-        <Card className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#D70902" }} onClick={() => handleClick("Denied")}>
+        <Card className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#DC3545" }} onClick={() => handleClick("Denied")}>
           <Cancel />
-          <Typography className="statusText" noWrap style={{ fontSize: "10px" }}>
+          <Typography className="statusText" noWrap style={{ fontSize: "12px", fontWeight: 'bolder' }}>
             Denied ({status.Denied})
           </Typography>
         </Card>
       </Item>
 
       <Item>
-        <Card className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#343434" }} onClick={() => handleClick("Archived")}>
+        <Card className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#343A40" }} onClick={() => handleClick("Archived")}>
           <Lock />
-          <Typography className="statusText" noWrap style={{ fontSize: "10px" }}>
+          <Typography className="statusText" noWrap style={{ fontSize: "12px", fontWeight: 'bolder' }}>
             Archived ({status.Archived})
           </Typography>
         </Card>
       </Item>
 
       <Item>
-        <Card  className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#276787" }} onClick={() => handleClick("Conditional")}>
+        <Card  className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#5BC0DE" }} onClick={() => handleClick("Contingent")}>
           <Alarm />
-          <Typography className="statusText" noWrap style={{ fontSize: "10px" }}>
-            Conditional ({status.Conditional})
+          <Typography className="statusText" noWrap style={{ fontSize: "12px", fontWeight: 'bolder' }}>
+            Contingent ({status.Contingent})
           </Typography>
         </Card>
       </Item>
 
       <Item>
-        <Card  className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#9A9A9A" }} onClick={() => handleClick("Unsubmitted")}>
+        <Card  className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#6C757D" }} onClick={() => handleClick("Unsubmitted")}>
           <HourglassBottom />
-          <Typography noWrap className="statusText" style={{ fontSize: "10px" }}>
+          <Typography noWrap className="statusText" style={{ fontSize: "12px", fontWeight: 'bolder' }}>
             Unsubmitted ({status.Unsubmitted})
           </Typography>
         </Card>
@@ -204,12 +266,13 @@ const CustomField = (props: CustomFieldProps) => {
       <Item>
         <Card  className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#0F0F0F" }} onClick={() => handleClick("All")}>
           <Undo/>
-          <Typography noWrap className="statusText" style={{ fontSize: "10px" }}>
+          <Typography noWrap className="statusText" style={{ fontSize: "12px", fontWeight: 'bolder' }}>
             All 
           </Typography>
         </Card>
       </Item>
     </Container>
+    </>
   );
 };
 
