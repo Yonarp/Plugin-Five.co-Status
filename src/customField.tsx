@@ -1,3 +1,4 @@
+//@ts-nocheck
 import React, { useEffect, useState } from "react";
 import { Box, Card, CircularProgress, FiveInitialize } from "./FivePluginApi";
 import { CustomFieldProps } from "../../../common";
@@ -45,24 +46,26 @@ const CustomField = (props: CustomFieldProps) => {
     return statusCounts;
   };
 
-  console.log("Account Key is", accountKey)
-  
   const handleClick = (status: string) => {
     if(status === 'All') {
-      five.setVariable("Status", `"__ACT" eq '${accountKey}'`);
+      five.setVariable("Status",`"__ACT" eq '${accountKey}'`);
     }
-  /*   else if(status === 'Archived') { 
+  /*  
+    else if(status === 'Archived') { 
         
-      five.setVariable("Status", `"__USR" eq '${five.currentUserKey()}' and  "_isArchived" eq 1`);
-    } */
+      five.setVariable("Status", ⁠ "__USR" eq '${five.currentUserKey()}' and  "_isArchived" eq 1 ⁠);
+
+    }
+
+  */
 
     else {
-
-      //five.setVariable("Status", `"__USR" eq '${five.currentUserKey()}' and Status eq '${status}'`);
-     
-      five.setVariable("Status", `"__ACT" eq '${accountKey}' and Status eq '${status}'`);
+      //five.setVariable("Status", ⁠ "__USR" eq '${five.currentUserKey()}' and Status eq '${status}' ⁠);
+      five.setVariable("Status",` "__ACT" eq '${accountKey}' and Status eq '${status}'`);
     }
+
     five.refreshDataViews();
+
   };
 
   useEffect(() => {
@@ -82,11 +85,11 @@ const CustomField = (props: CustomFieldProps) => {
         (result) => {
           // barrier can have issues if the values 
           const data = JSON.parse(result.serverResponse.results).response.value;
- 
           setLoading(false);
           const statusCounts = countStatuses(data);
           setStatus(statusCounts);
           setAccountKey(data[0].__ACT)
+          five.setVariable("StatusIVRAccount", data[0].__ACT)
         }
       );
 
@@ -99,13 +102,11 @@ const CustomField = (props: CustomFieldProps) => {
         (result) => {
         
           const data = JSON.parse(result.serverResponse.results).response.value
-          console.log("Logging Data from the Status Plugin.", data)
           setAccountList(data)
 
         }
       );
     };
-
 
     fetchData();   
 
@@ -113,6 +114,22 @@ const CustomField = (props: CustomFieldProps) => {
 
 
   useEffect(() => {
+
+    const actObj = {
+      ACT: accountKey
+    }
+
+    five.setVariable("StatusIVRAccount", accountKey)
+    const fetchData = async () => {
+      five.executeFunction("getAccountIVRDetails", actObj, null, null, null, (result) => {
+        const data = JSON.parse(result.serverResponse.results).response.value;
+        const statusCounts = countStatuses(data);
+        setStatus(statusCounts);
+
+      })
+    }
+
+    fetchData()
     handleClick('All')
   }, [accountKey])
 
@@ -165,12 +182,43 @@ const CustomField = (props: CustomFieldProps) => {
      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 
   }
-  `;
+  
+  /* Add CSS for positioning the account dropdown */
+  .accountDropdown {
+    position: absolute;
+    top: 85px; /* Position at the Status row header */
+    left: -50px; /* Adjust as needed */
+    z-index: 999;
+    background-color: white;
+    width: 200px;
+  }
+
+    /* Target the parent container with the specific class */
+  #Five-Form-Field-Statises {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none, 
+    outline: none,
+  }
+   
+  `
+  
+  ;
 
   return (
     <>
-    <Box sx={{ mb: 2 }}>
-      <FormControl size="small">
+    <style>{cardCss}</style>
+    
+    {/* Position the account dropdown above the Status column */}
+    <div style={{
+        position: "absolute",
+        bottom: "65%", /* Position at the Status row header */
+        left: "-27%", /* Adjust as needed */
+        backgroundColor:"white",
+        width: "250px",
+        zIndex: 999
+    }}>
+      <FormControl size="small" fullWidth>
         <InputLabel id="account-select-label">Account</InputLabel>
         <Select
           labelId="account-select-label"
@@ -185,31 +233,26 @@ const CustomField = (props: CustomFieldProps) => {
           ))}
         </Select>
       </FormControl>
-    </Box>
-
+    </div>
 
 
     <Container
       style={{
-       /*  position: 'absolute',
-        top: 5, */
         padding: 0,
         margin: 0,
-        marginTop: 20,           
-       // marginLeft: "-10%",
-       // left: "-10%",
-        width:'130%',
+        marginTop: 5,           
+        width:'100%',
         display: "flex",
         flexDirection: "row",
-        flexWrap: "nowrap", // Prevent wrapping
-        overflowX: "auto", // Enable horizontal scroll
-        background: "white",
+        flexWrap: "nowrap", 
+        overflowX: "auto", 
+        background: "transparent",
         border: "none", 
-        outline: "none"
+        outline: "none",
+        justifyContent: 'center',
+        alignContent: 'center'
       }}
     >
-      <style>{cardCss}</style>
-
       <Item>
         <Card className="MuiCard-root" style={{ ...cardStyle, backgroundColor: "#15706A" }} onClick={() => handleClick("Approved")}>
           <Check style={{ fill: "white", color: "white" }} />
@@ -275,8 +318,6 @@ const CustomField = (props: CustomFieldProps) => {
     </>
   );
 };
-
-
 
 function Item(props) {
   return (
