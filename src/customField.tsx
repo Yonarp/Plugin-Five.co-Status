@@ -1,6 +1,12 @@
 //@ts-nocheck
 import React, { useEffect, useState } from "react";
-import { Box, Card, CircularProgress, FiveInitialize } from "./FivePluginApi";
+import {
+  Box,
+  Card,
+  CircularProgress,
+  FiveInitialize,
+  Button,
+} from "./FivePluginApi";
 import { CustomFieldProps } from "../../../common";
 import { Container, Typography } from "@mui/material";
 import {
@@ -40,14 +46,19 @@ const CustomField = (props: CustomFieldProps) => {
   const [accountList, setAccountList] = useState([]);
   const [inputValue, setInputValue] = useState<string>("");
 
-  // Ensure the dropdown always has a value
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(10);            //  ▼▼ new
+  const [records, setRecords] = useState([]);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+
+  /* ───── Ensure the dropdown always has a value ───── */
   useEffect(() => {
     if (accountKey === "" && accountList.length > 0) {
       setAccountKey(accountList[0].__ACT);
     }
   }, [accountList, accountKey]);
 
-  // FIX Type
+  /* ───── Helpers ───── */
   const countStatuses = (data: any) => {
     const statusCounts = {
       Approved: 0,
@@ -60,96 +71,106 @@ const CustomField = (props: CustomFieldProps) => {
 
     if (data.length > 0) {
       data.forEach((item: any) => {
-        const status = item.Status;
-        statusCounts[status]++;
+        const st = item.Status;
+        statusCounts[st]++;
       });
     }
     return statusCounts;
   };
 
-  const handleClick = (status: string) => {
-    if (status === "All") {
-      five.setVariable("Status", `"__ACT" eq '${accountKey}'`);
-    } else {
-      five.setVariable(
-        "Status",
-        ` "__ACT" eq '${accountKey}' and Status eq '${status}'`
-      );
-    }
+  const handleClick = (st: string) => {
+    setPage(1); // reset to first page
+
+    const filterExpr =
+      st === "All"
+        ? `__ACT eq '${accountKey}'`
+        : `__ACT eq '${accountKey}' and Status eq '${st}'`;
+
+    const statusVar = `${filterExpr}&$top=${pageSize}&$skip=0`;
+    five.setVariable("Status", statusVar);
+    five.setVariable("StatusIVRAccount", accountKey);
     five.refreshDataViews();
   };
 
+  /* ───── Initial load ───── */
   useEffect(() => {
-    if (status !== null) {
-      return;
-    }
+    if (status !== null) return;
 
     setLoading(true);
-    const fetchData = () => {
-      five.executeFunction(
-        "getAccountIVR",
-        null,
-        null,
-        null,
-        null,
-        (result) => {
-          const data = JSON.parse(result.serverResponse.results).response.value;
-          setLoading(false);
-          const statusCounts = countStatuses(data);
-          setStatus(statusCounts);
-          setAccountKey(data[0].__ACT);
-          five.setVariable("StatusIVRAccount", data[0].__ACT);
-        }
-      );
-
-      five.executeFunction("getUserAUJ", null, null, null, null, (result) => {
+    five.executeFunction(
+      "getAccountIVR",
+      null,
+      null,
+      null,
+      null,
+      (result) => {
         const data = JSON.parse(result.serverResponse.results).response.value;
-        setAccountList(data);
-      });
-    };
+        setLoading(false);
+        setStatus(countStatuses(data));
+        setAccountKey(data[0].__ACT);
+        setInputValue(data[0].OfficeName);
+        five.setVariable("StatusIVRAccount", data[0].__ACT);
+      }
+    );
 
-    fetchData();
+    five.executeFunction("getUserAUJ", null, null, null, null, (result) => {
+      const data = JSON.parse(result.serverResponse.results).response.value;
+      data.sort((a, b) =>
+        (a.OfficeName || "").localeCompare(b.OfficeName || "")
+      );
+      setAccountList(data);
+    });
   }, []);
 
+  /* ───── Reset page when account changes ───── */
   useEffect(() => {
-    const actObj = {
-      ACT: accountKey,
-    };
-
-    five.setVariable("StatusIVRAccount", accountKey);
-    const fetchData = async () => {
-      five.executeFunction(
-        "getAccountIVRDetails",
-        actObj,
-        null,
-        null,
-        null,
-        (result) => {
-          const data = JSON.parse(result.serverResponse.results).response.value;
-          const statusCounts = countStatuses(data);
-          setStatus(statusCounts);
-        }
-      );
-    };
-
-    fetchData();
-    handleClick("All");
+    setPage(1);
   }, [accountKey]);
+
+  /* ───── Load data when account / page / pageSize changes ───── */
+  useEffect(() => {
+    if (!accountKey) return;
+    setLoading(true);
+
+    const skip = (page - 1) * pageSize;
+    const top = pageSize;
+    const filterExpr = `__ACT eq '${accountKey}'`;
+    const statusVar = `${filterExpr}&$top=${top}&$skip=${skip}`;
+
+    five.setVariable("Status", statusVar);
+    five.setVariable("StatusIVRAccount", accountKey);
+    five.refreshDataViews();
+
+    five.executeFunction(
+      "getAccountIVRDetails",
+      { ACT: accountKey, top, skip },
+      null,
+      null,
+      null,
+      (result) => {
+        const res = JSON.parse(result.serverResponse.results).response;
+        const data = res.value;
+        setStatus(countStatuses(data));
+        setRecords(data);
+        if (res["@odata.count"] != null) {
+          setTotalCount(res["@odata.count"]);
+        }
+        setLoading(false);
+      }
+    );
+  }, [accountKey, page, pageSize]);             
 
   if (loading || !status) {
     return (
       <Container
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
+        style={{ display: "flex", justifyContent: "center", alignItems: "center" }}
       >
         <CircularProgress />
       </Container>
     );
   }
 
+  /* ───── Styles ───── */
   const cardStyle = {
     display: "flex",
     justifyContent: "center",
@@ -163,27 +184,20 @@ const CustomField = (props: CustomFieldProps) => {
 
   const cardCss = `
   .statusText {
-     @media (max-width: 630px) {
-       display: none;
-     }
-     @media (max-width: 750px) {
-      font-size:8.5px;
-     }
+    @media (max-width: 630px) { display: none; }
+    @media (max-width: 750px) { font-size: 8.5px; }
   }
-  
-   .MuiCard-root {
-     transition: transform 0.2s ease, box-shadow 0.2s ease;
+  .MuiCard-root {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .MuiCard-root:hover {
-     transform: scale(1.05);
-     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   }
-
   .MuiCard-root:focus {
-     transform: scale(1.02);
-     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transform: scale(1.02);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   }
-  
   .accountDropdown {
     position: absolute;
     top: 85px;
@@ -192,23 +206,23 @@ const CustomField = (props: CustomFieldProps) => {
     background-color: white;
     width: 200px;
   }
-
   #Five-Form-Field-Statises {
     background-color: transparent !important;
     box-shadow: none !important;
     border: none;
     outline: none;
-  }
-  `;
+  }`;
 
+  /* ───── JSX ───── */
   return (
     <>
       <style>{cardCss}</style>
 
+      {/* ──── Account & Page-size dropdowns ──── */}
       <div
         style={{
           position: "absolute",
-          bottom: "65%",
+          bottom: "50%",
           left: "-27%",
           backgroundColor: "white",
           width: "250px",
@@ -220,31 +234,44 @@ const CustomField = (props: CustomFieldProps) => {
           fullWidth
           options={accountList}
           getOptionLabel={(opt) => opt.OfficeName || ""}
-          // ever-present selection
           value={accountList.find((a) => a.__ACT === accountKey) || null}
-          // what the user is typing
           inputValue={inputValue}
           onInputChange={(_, newInput, reason) => {
-            if (reason === "input") {
-              setInputValue(newInput);
-            }
+            if (reason === "input") setInputValue(newInput);
           }}
-          // only fire when they pick from the list
           onChange={(_, newOption, reason) => {
             if (reason === "selectOption" && newOption) {
               setAccountKey(newOption.__ACT);
               setInputValue(newOption.OfficeName);
             }
           }}
-          clearOnBlur={false} // don’t reset on blur
-          disableClearable // removes the “×” clear button
+          clearOnBlur={false}
+          disableClearable
           renderInput={(params) => (
             <TextField {...params} label="Account" variant="outlined" />
           )}
         />
-        
+
+
+        <FormControl size="small" fullWidth style={{ marginTop: 8 }}>
+          <InputLabel id="pg-size-label">Page Size</InputLabel>
+          <Select
+            labelId="pg-size-label"
+            value={pageSize}
+            label="Page Size"
+            onChange={(e) => {
+              setPageSize(e.target.value as number);
+              setPage(1);
+            }}
+          >
+            <MenuItem value={10}>10</MenuItem>
+            <MenuItem value={50}>50</MenuItem>
+            <MenuItem value={100}>100</MenuItem>
+          </Select>
+        </FormControl>
       </div>
 
+      {/* ──── Status cards container ──── */}
       <Container
         style={{
           padding: 0,
@@ -262,18 +289,15 @@ const CustomField = (props: CustomFieldProps) => {
           alignContent: "center",
         }}
       >
+        {/* Repeat for each status card */}
         <Item>
           <Card
             className="MuiCard-root"
             style={{ ...cardStyle, backgroundColor: "#15706A" }}
             onClick={() => handleClick("Approved")}
           >
-            <Check style={{ fill: "white", color: "white" }} />
-            <Typography
-              className="statusText"
-              noWrap
-              style={{ fontSize: "12px", fontWeight: "bolder" }}
-            >
+            <Check style={{ fill: "white" }} />
+            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
               Approved ({status.Approved})
             </Typography>
           </Card>
@@ -285,12 +309,8 @@ const CustomField = (props: CustomFieldProps) => {
             style={{ ...cardStyle, backgroundColor: "#F9AD3C" }}
             onClick={() => handleClick("Submitted")}
           >
-            <HourglassBottom style={{ fill: "white", color: "white" }} />
-            <Typography
-              className="statusText"
-              noWrap
-              style={{ fontSize: "12px", fontWeight: "bolder" }}
-            >
+            <HourglassBottom style={{ fill: "white" }} />
+            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
               Submitted ({status.Submitted})
             </Typography>
           </Card>
@@ -302,12 +322,8 @@ const CustomField = (props: CustomFieldProps) => {
             style={{ ...cardStyle, backgroundColor: "#DC3545" }}
             onClick={() => handleClick("Denied")}
           >
-            <Cancel />
-            <Typography
-              className="statusText"
-              noWrap
-              style={{ fontSize: "12px", fontWeight: "bolder" }}
-            >
+            <Cancel style={{ fill: "white" }} />
+            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
               Denied ({status.Denied})
             </Typography>
           </Card>
@@ -319,12 +335,8 @@ const CustomField = (props: CustomFieldProps) => {
             style={{ ...cardStyle, backgroundColor: "#343A40" }}
             onClick={() => handleClick("Archived")}
           >
-            <Lock />
-            <Typography
-              className="statusText"
-              noWrap
-              style={{ fontSize: "12px", fontWeight: "bolder" }}
-            >
+            <Lock style={{ fill: "white" }} />
+            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
               Archived ({status.Archived})
             </Typography>
           </Card>
@@ -336,12 +348,8 @@ const CustomField = (props: CustomFieldProps) => {
             style={{ ...cardStyle, backgroundColor: "#5BC0DE" }}
             onClick={() => handleClick("Contingent")}
           >
-            <Alarm />
-            <Typography
-              className="statusText"
-              noWrap
-              style={{ fontSize: "12px", fontWeight: "bolder" }}
-            >
+            <Alarm style={{ fill: "white" }} />
+            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
               Contingent ({status.Contingent})
             </Typography>
           </Card>
@@ -353,33 +361,49 @@ const CustomField = (props: CustomFieldProps) => {
             style={{ ...cardStyle, backgroundColor: "#6C757D" }}
             onClick={() => handleClick("Unsubmitted")}
           >
-            <HourglassBottom />
-            <Typography
-              noWrap
-              className="statusText"
-              style={{ fontSize: "12px", fontWeight: "bolder" }}
-            >
+            <HourglassBottom style={{ fill: "white" }} />
+            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
               Unsubmitted ({status.Unsubmitted})
             </Typography>
           </Card>
         </Item>
+
         <Item>
           <Card
             className="MuiCard-root"
             style={{ ...cardStyle, backgroundColor: "#0F0F0F" }}
             onClick={() => handleClick("All")}
           >
-            <Undo />
-            <Typography
-              noWrap
-              className="statusText"
-              style={{ fontSize: "12px", fontWeight: "bolder" }}
-            >
+            <Undo style={{ fill: "white" }} />
+            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
               All
             </Typography>
           </Card>
         </Item>
       </Container>
+
+      {/* ──── Pagination controls ──── */}
+      <div style={{ textAlign: "center", margin: "12px 0" }}>
+        <button onClick={() => setPage((p) => Math.max(p - 1, 1))} disabled={page === 1 || loading}>
+          Prev
+        </button>
+
+        <span style={{ margin: "0 8px" }}>
+          Page {page}
+          {totalCount != null && ` of ${Math.ceil(totalCount / pageSize)}`}
+        </span>
+
+        <button
+          onClick={() =>
+            setPage((p) =>
+              totalCount ? Math.min(p + 1, Math.ceil(totalCount / pageSize)) : p + 1
+            )
+          }
+          disabled={loading || (totalCount != null && page >= Math.ceil(totalCount / pageSize))}
+        >
+          Next
+        </button>
+      </div>
     </>
   );
 };
@@ -402,11 +426,3 @@ function Item(props) {
 }
 
 export default CustomField;
-
-/* MuiDataGrid-columnSeparator MuiDataGrid-columnSeparator--resizable MuiDataGrid-columnSeparator--sideRight 
-
-  
-
-
-
-*/
