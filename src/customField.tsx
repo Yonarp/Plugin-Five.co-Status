@@ -1,4 +1,4 @@
-//@ts-nocheck
+// @ts-nocheck
 import React, { useEffect, useState } from "react";
 import {
   Box,
@@ -39,111 +39,68 @@ interface StatusCounts {
 
 const CustomField = (props: CustomFieldProps) => {
   const { five } = props;
-  const [loading, setLoading] = useState<boolean>(false);
-  const [status, setStatus] = useState<StatusCounts>(null);
-  const [accountKey, setAccountKey] = useState<string>("");
-  //@ts-ignore
+  const [loading, setLoading] = useState<boolean>(true);
+  const [status, setStatus] = useState<StatusCounts | null>(null);
+  const [accountKey, setAccountKey] = useState<string | undefined>(undefined);
   const [accountList, setAccountList] = useState([]);
   const [inputValue, setInputValue] = useState<string>("");
 
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(10);            //  ▼▼ new
+  const [pageSize, setPageSize] = useState<number>(10);
   const [records, setRecords] = useState([]);
   const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [statusText, setStatusText] = useState<string>("");
 
-  /* ───── Ensure the dropdown always has a value ───── */
   useEffect(() => {
-    if (accountKey === "" && accountList.length > 0) {
-      setAccountKey(accountList[0].__ACT);
+    const ivrPageSize = five.getVariable("IVRPageSize")
+    if(ivrPageSize <= 10) {
+      setPageSize(10);
     }
-  }, [accountList, accountKey]);
-
-  /* ───── Helpers ───── */
-  const countStatuses = (data: any) => {
-    const statusCounts = {
-      Approved: 0,
-      Submitted: 0,
-      Denied: 0,
-      Archived: 0,
-      Contingent: 0,
-      Unsubmitted: 0,
-    };
-
-    if (data.length > 0) {
-      data.forEach((item: any) => {
-        const st = item.Status;
-        statusCounts[st]++;
-      });
+    else {
+      setPageSize(ivrPageSize);
     }
-    return statusCounts;
-  };
-
-  const handleClick = (st: string) => {
-    setPage(1); // reset to first page
-
-    const filterExpr =
-      st === "All"
-        ? `__ACT eq '${accountKey}'`
-        : `__ACT eq '${accountKey}' and Status eq '${st}'`;
-
-    const statusVar = `${filterExpr}&$top=${pageSize}&$skip=0`;
-    five.setVariable("Status", statusVar);
-    five.setVariable("StatusIVRAccount", accountKey);
-    five.refreshDataViews();
-  };
-
-  /* ───── Initial load ───── */
-  useEffect(() => {
-    if (status !== null) return;
-
-    setLoading(true);
-    five.executeFunction(
-      "getAccountIVR",
-      null,
-      null,
-      null,
-      null,
-      (result) => {
-        const data = JSON.parse(result.serverResponse.results).response.value;
-        setLoading(false);
-        setStatus(countStatuses(data));
-        setAccountKey(data[0].__ACT);
-        setInputValue(data[0].OfficeName);
-        five.setVariable("StatusIVRAccount", data[0].__ACT);
-      }
-    );
-
+    setPage(1);
     five.executeFunction("getUserAUJ", null, null, null, null, (result) => {
-      const data = JSON.parse(result.serverResponse.results).response.value;
-      data.sort((a, b) =>
-        (a.OfficeName || "").localeCompare(b.OfficeName || "")
-      );
-      setAccountList(data);
+      const accounts = JSON.parse(result.serverResponse.results).response.value;
+      accounts.sort((a, b) => (a.OfficeName || "").localeCompare(b.OfficeName || ""));
+      setAccountList(accounts);
     });
   }, []);
 
-  /* ───── Reset page when account changes ───── */
   useEffect(() => {
-    setPage(1);
-  }, [accountKey]);
+    if (accountList.length === 0) return;
+    const savedAccount = five.variable?.StatusIVRAccount;
+    const matched = accountList.find((a) => a.__ACT === savedAccount);
+    const selected = matched || accountList[0];
+    if (selected) {
+      setAccountKey(selected.__ACT);
+      setInputValue(selected.OfficeName);
+      five.setVariable("StatusIVRAccount", selected.__ACT);
+      fetchData(selected.__ACT, 1, pageSize);
+      setPage(1);
+    }
+  }, [accountList]);
 
-  /* ───── Load data when account / page / pageSize changes ───── */
   useEffect(() => {
-    if (!accountKey) return;
+    if (!accountKey || !accountList.find(a => a.__ACT === accountKey)) return;
+    five.setVariable("IVRPageSize", pageSize)
+    fetchData(accountKey, page, pageSize);
+  }, [accountKey, page, pageSize]);
+
+  const fetchData = (act: string, pageNum: number, size: number) => {
+    const skip = (pageNum - 1) * size;
+    const top = size;
+    const filterExpr = `__ACT eq '${act}'`;
+    const statusVar = `${filterExpr}${statusText}&$top=${top}&$skip=${skip}`;
+    console.log("Showing statusText with this", statusVar, statusText)
     setLoading(true);
-
-    const skip = (page - 1) * pageSize;
-    const top = pageSize;
-    const filterExpr = `__ACT eq '${accountKey}'`;
-    const statusVar = `${filterExpr}&$top=${top}&$skip=${skip}`;
-
     five.setVariable("Status", statusVar);
-    five.setVariable("StatusIVRAccount", accountKey);
+    five.setVariable("StatusIVRAccount", act);
     five.refreshDataViews();
 
     five.executeFunction(
       "getAccountIVRDetails",
-      { ACT: accountKey, top, skip },
+      { ACT: act, top, skip },
       null,
       null,
       null,
@@ -152,25 +109,42 @@ const CustomField = (props: CustomFieldProps) => {
         const data = res.value;
         setStatus(countStatuses(data));
         setRecords(data);
-        if (res["@odata.count"] != null) {
-          setTotalCount(res["@odata.count"]);
+        if (data.length > 0 && data[0].zCount != null) {
+          setTotalCount(data[0].zCount);
         }
         setLoading(false);
       }
     );
-  }, [accountKey, page, pageSize]);             
+  };
 
-  if (loading || !status) {
-    return (
-      <Container
-        style={{ display: "flex", justifyContent: "center", alignItems: "center" }}
-      >
-        <CircularProgress />
-      </Container>
-    );
-  }
+  const countStatuses = (data: any) => {
+    const counts = {
+      Approved: 0,
+      Submitted: 0,
+      Denied: 0,
+      Archived: 0,
+      Contingent: 0,
+      Unsubmitted: 0,
+    };
+    data.forEach((item: any) => {
+      if (counts[item.Status] !== undefined) counts[item.Status]++;
+    });
+    return counts;
+  };
 
-  /* ───── Styles ───── */
+  const handleClick = (st: string) => {
+    setPage(1);
+    const filterExpr =
+      st === "All"
+        ? `__ACT eq '${accountKey}'`
+        : `__ACT eq '${accountKey}' and Status eq '${st}'`;
+      st === "All" ? setStatusText("") : setStatusText(` and Status eq '${st}'`)
+    const statusVar = `${filterExpr}&$top=${pageSize}&$skip=0`;
+    five.setVariable("Status", statusVar);
+    five.setVariable("StatusIVRAccount", accountKey);
+    five.refreshDataViews();
+  };
+
   const cardStyle = {
     display: "flex",
     justifyContent: "center",
@@ -183,7 +157,7 @@ const CustomField = (props: CustomFieldProps) => {
   };
 
   const cardCss = `
-  .statusText {
+     .statusText {
     @media (max-width: 630px) { display: none; }
     @media (max-width: 750px) { font-size: 8.5px; }
   }
@@ -211,29 +185,27 @@ const CustomField = (props: CustomFieldProps) => {
     box-shadow: none !important;
     border: none;
     outline: none;
-  }`;
+  }
+  `;
 
-  /* ───── JSX ───── */
+  if (loading || !status) {
+    return (
+      <Container style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
+
   return (
     <>
       <style>{cardCss}</style>
 
-      {/* ──── Account & Page-size dropdowns ──── */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: "50%",
-          left: "-27%",
-          backgroundColor: "white",
-          width: "250px",
-          zIndex: 999,
-        }}
-      >
+      <div style={{ position: "absolute", bottom: "50%", left: "-27%", backgroundColor: "white", width: "250px", zIndex: 999 }}>
         <Autocomplete
           size="small"
           fullWidth
           options={accountList}
-          getOptionLabel={(opt) => opt.OfficeName || ""}
+          getOptionLabel={(opt) => (opt?.OfficeName ? String(opt.OfficeName) : "")}
           value={accountList.find((a) => a.__ACT === accountKey) || null}
           inputValue={inputValue}
           onInputChange={(_, newInput, reason) => {
@@ -243,6 +215,8 @@ const CustomField = (props: CustomFieldProps) => {
             if (reason === "selectOption" && newOption) {
               setAccountKey(newOption.__ACT);
               setInputValue(newOption.OfficeName);
+              five.setVariable("StatusIVRAccount", newOption.__ACT);
+              setPage(1);
             }
           }}
           clearOnBlur={false}
@@ -251,7 +225,6 @@ const CustomField = (props: CustomFieldProps) => {
             <TextField {...params} label="Account" variant="outlined" />
           )}
         />
-
 
         <FormControl size="small" fullWidth style={{ marginTop: 8 }}>
           <InputLabel id="pg-size-label">Page Size</InputLabel>
@@ -271,118 +244,27 @@ const CustomField = (props: CustomFieldProps) => {
         </FormControl>
       </div>
 
-      {/* ──── Status cards container ──── */}
-      <Container
-        style={{
-          padding: 0,
-          margin: 0,
-          marginTop: 5,
-          width: "100%",
-          display: "flex",
-          flexDirection: "row",
-          flexWrap: "nowrap",
-          overflowX: "auto",
-          background: "transparent",
-          border: "none",
-          outline: "none",
-          justifyContent: "center",
-          alignContent: "center",
-        }}
-      >
-        {/* Repeat for each status card */}
-        <Item>
-          <Card
-            className="MuiCard-root"
-            style={{ ...cardStyle, backgroundColor: "#15706A" }}
-            onClick={() => handleClick("Approved")}
-          >
-            <Check style={{ fill: "white" }} />
-            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
-              Approved ({status.Approved})
-            </Typography>
-          </Card>
-        </Item>
-
-        <Item>
-          <Card
-            className="MuiCard-root"
-            style={{ ...cardStyle, backgroundColor: "#F9AD3C" }}
-            onClick={() => handleClick("Submitted")}
-          >
-            <HourglassBottom style={{ fill: "white" }} />
-            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
-              Submitted ({status.Submitted})
-            </Typography>
-          </Card>
-        </Item>
-
-        <Item>
-          <Card
-            className="MuiCard-root"
-            style={{ ...cardStyle, backgroundColor: "#DC3545" }}
-            onClick={() => handleClick("Denied")}
-          >
-            <Cancel style={{ fill: "white" }} />
-            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
-              Denied ({status.Denied})
-            </Typography>
-          </Card>
-        </Item>
-
-        <Item>
-          <Card
-            className="MuiCard-root"
-            style={{ ...cardStyle, backgroundColor: "#343A40" }}
-            onClick={() => handleClick("Archived")}
-          >
-            <Lock style={{ fill: "white" }} />
-            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
-              Archived ({status.Archived})
-            </Typography>
-          </Card>
-        </Item>
-
-        <Item>
-          <Card
-            className="MuiCard-root"
-            style={{ ...cardStyle, backgroundColor: "#5BC0DE" }}
-            onClick={() => handleClick("Contingent")}
-          >
-            <Alarm style={{ fill: "white" }} />
-            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
-              Contingent ({status.Contingent})
-            </Typography>
-          </Card>
-        </Item>
-
-        <Item>
-          <Card
-            className="MuiCard-root"
-            style={{ ...cardStyle, backgroundColor: "#6C757D" }}
-            onClick={() => handleClick("Unsubmitted")}
-          >
-            <HourglassBottom style={{ fill: "white" }} />
-            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
-              Unsubmitted ({status.Unsubmitted})
-            </Typography>
-          </Card>
-        </Item>
-
-        <Item>
-          <Card
-            className="MuiCard-root"
-            style={{ ...cardStyle, backgroundColor: "#0F0F0F" }}
-            onClick={() => handleClick("All")}
-          >
-            <Undo style={{ fill: "white" }} />
-            <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
-              All
-            </Typography>
-          </Card>
-        </Item>
+      <Container style={{ padding: 0, margin: 0, marginTop: 5, width: "100%", display: "flex", flexWrap: "nowrap", overflowX: "auto", justifyContent: "center" }}>
+        {[
+          { label: "Approved", color: "#15706A", icon: <Check /> },
+          { label: "Submitted", color: "#F9AD3C", icon: <HourglassBottom /> },
+          { label: "Denied", color: "#DC3545", icon: <Cancel /> },
+          { label: "Archived", color: "#343A40", icon: <Lock /> },
+          { label: "Contingent", color: "#5BC0DE", icon: <Alarm /> },
+          { label: "Unsubmitted", color: "#6C757D", icon: <HourglassBottom /> },
+          { label: "All", color: "#0F0F0F", icon: <Undo /> },
+        ].map(({ label, color, icon }) => (
+          <Item key={label}>
+            <Card className="MuiCard-root" style={{ ...cardStyle, backgroundColor: color }} onClick={() => handleClick(label)}>
+              {React.cloneElement(icon, { style: { fill: "white" } })}
+              <Typography className="statusText" noWrap style={{ fontSize: 12, fontWeight: "bolder" }}>
+                {label} {label !== "All" ? `(${status[label]})` : ""}
+              </Typography>
+            </Card>
+          </Item>
+        ))}
       </Container>
 
-      {/* ──── Pagination controls ──── */}
       <div style={{ textAlign: "center", margin: "12px 0" }}>
         <button onClick={() => setPage((p) => Math.max(p - 1, 1))} disabled={page === 1 || loading}>
           Prev
